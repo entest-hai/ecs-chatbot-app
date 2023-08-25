@@ -37,14 +37,20 @@ export class CodePipelineStack extends Stack {
     );
 
     // ecr repository
-    const ecrRepository = new aws_ecr.Repository(
+    // const ecrRepository = new aws_ecr.Repository(
+    //   this,
+    //   "EcrRepositoryForChatbot",
+    //   {
+    //     removalPolicy: RemovalPolicy.DESTROY,
+    //     repositoryName: props.ecrRepoName,
+    //     autoDeleteImages: true,
+    //   }
+    // );
+
+    const ecrRepository = aws_ecr.Repository.fromRepositoryName(
       this,
       "EcrRepositoryForChatbot",
-      {
-        removalPolicy: RemovalPolicy.DESTROY,
-        repositoryName: props.ecrRepoName,
-        autoDeleteImages: true,
-      }
+      props.ecrRepoName
     );
 
     // artifact - source code
