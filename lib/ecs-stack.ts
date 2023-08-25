@@ -14,6 +14,7 @@ import { Construct } from "constructs";
 interface EcsProps extends StackProps {
   vpcId: string;
   vpcName: string;
+  ecrRepoName: string;
 }
 
 export class EcsStack extends Stack {
@@ -89,7 +90,7 @@ export class EcsStack extends Stack {
         aws_ecr.Repository.fromRepositoryName(
           this,
           "entest-chatbot-app",
-          "entest-chatbot-app"
+          props.ecrRepoName
         )
       ),
       portMappings: [{ containerPort: 3000 }],
@@ -124,7 +125,7 @@ export class EcsStack extends Stack {
     // scaling on cpu utilization
     const scaling = service.autoScaleTaskCount({
       maxCapacity: 4,
-      minCapacity: 1,
+      minCapacity: 2,
     });
 
     scaling.scaleOnMemoryUtilization("CpuUtilization", {

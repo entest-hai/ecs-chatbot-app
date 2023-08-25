@@ -482,50 +482,25 @@ export class CodePipelineStack extends Stack {
 
 ## CDK Deploy
 
-- Step 1. Build and test the chatbot app manually
-- Step 2. Deploy the EcsStack
-- Step 3. Deploy the CodePipelineChatbotStack
+- Step 1. Deploy EcrStack
+- Step 2. Build and push an ECR image manulaly
+- Step 3. Deploy the EcsStack
+- Step 4. Deploy the CodePipelineChatbotStack
 
-**Step 1. Build and test the chatbot app manually**
+> [!IMPORTANT]
+> In step 3, so ECS cluster task can pull an image which created manually in step 2. After step 4, we can check the Application Load Balancer URL and see the service working. Please ensure to provide .env with your Hugging Face API Key. Due to rate limite of free API, sometimes you might experience no response from the bot.
+
+**Step 1. Deploy EcrStack which create a ECR repository**
+
+```bash
+cdk deploy EcrStack
+```
+
+**Step 2. Build and push an ECR image manulaly**
 
 There is a python script in /chatbot-app/build.py will
 
-- Create a ECR repository named: entest-chatbot-app
-- Build and push an image to entest-chatbot-app
-
-```py
-import os
-
-# parameters
-REGION = "ap-southeast-1"
-ACCOUNT = ""
-
-# delete all docker images
-os.system("sudo docker system prune -a")
-
-# build entest-chatbot-app image
-os.system("sudo docker build -t entest-chatbot-app . ")
-
-#  aws ecr login
-os.system(f"aws ecr get-login-password --region {REGION} | sudo docker login --username AWS --password-stdin {ACCOUNT}.dkr.ecr.{REGION}.amazonaws.com")
-
-# get image id
-IMAGE_ID=os.popen("sudo docker images -q entest-chatbot-app:latest").read()
-
-# tag entest-chatbot-app image
-os.system(f"sudo docker tag {IMAGE_ID.strip()} {ACCOUNT}.dkr.ecr.{REGION}.amazonaws.com/entest-chatbot-app:latest")
-
-# create ecr repository
-os.system(f"aws ecr create-repository --registry-id {ACCOUNT} --repository-name entest-chatbot-app")
-
-# # push image to ecr
-os.system(f"sudo docker push {ACCOUNT}.dkr.ecr.{REGION}.amazonaws.com/entest-chatbot-app:latest")
-```
-
-Let run go to the chatbot-app and run this python script
-
 ```bash
-cd chatbot-app
 python3 build.py
 ```
 
@@ -535,7 +510,7 @@ You can test this iamge locally
 sudo docker run -p 3000:3000 $IMAGE_NAME
 ```
 
-**Step 2. Deploy the EcsStack**
+**Step 3. Deploy the EcsStack**
 
 Goto the bin directory and deploy the ecs cluster using cdk
 
@@ -543,13 +518,7 @@ Goto the bin directory and deploy the ecs cluster using cdk
 cdk deploy EcsStack
 ```
 
-> [!IMPORTANT]
-> The ECS task will pull the image from the entest-chatbot-app reposotry created from the build.py above. In step 3, we will replace this manual setp by a CI/CD pipeline (simple verion without blue/green deployment). After deploying the ECS cluster, please find the Application Load Blancer endpoint and check that the app working.
-
-**Step 3. Deploy the CodePipeline**
-
-> [!IMPORTANT]
-> This code pipeline will build ecr image and push to the entest-chatbot-app repository created by build.py. Then CodeDeploy will deploy latest image to the ecs task.
+**Step 4. Deploy the CodePipeline**
 
 ```bash
 cdk deploy CodePipelineChatbotStack
