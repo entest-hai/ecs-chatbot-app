@@ -488,7 +488,10 @@ export class CodePipelineStack extends Stack {
 
 **Step 1. Build and test the chatbot app manually**
 
-There is a python script in /chatbot-app/build.py to build and push an image to ecr
+There is a python script in /chatbot-app/build.py will
+
+- Create a ECR repository named: entest-chatbot-app
+- Build and push an image to entest-chatbot-app
 
 ```py
 import os
