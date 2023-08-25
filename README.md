@@ -14,6 +14,10 @@ date: 20/08/2023
 - deploy the web app using cdk
 - build a ci/cd pipeline using cdk
 
+> [!IMPORTANT]
+> Please check below video for detail how to deploy the app on amazon ecs and codepipeline
+> [coding part 2](https://d2cvlmmg8c0xrp.cloudfront.net/mp4/ecs-chatbot-app-part-2.mp4)
+
 ## Setup Project
 
 Let create a new folder for the project
