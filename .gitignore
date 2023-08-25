@@ -8,10 +8,5 @@ node_modules
 cdk.out
 
 # 
-book-app 
 **.next 
 **node_modules
-
-# 
-**build.py 
-**build-public.py 
