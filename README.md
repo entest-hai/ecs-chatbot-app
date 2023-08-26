@@ -438,6 +438,9 @@ export class CodePipelineStack extends Stack {
 
 > CDK automatically create role for codebuild, codedeploy, and codepipeline. Below is the content of the iam policy generated for codepipeline role. The codepline role will assume on of three different role for codebuild action, ecsdeploy action, and source action.
 
+<details>
+  <summary>ROLE</summary>
+
 ```json
 {
   "Version": "2012-10-17",
@@ -484,6 +487,8 @@ export class CodePipelineStack extends Stack {
   ]
 }
 ```
+
+</details>
 
 ## CDK Deploy
 
