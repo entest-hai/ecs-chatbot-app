@@ -544,3 +544,5 @@ cdk deploy CodePipelineChatbotStack
 - [vercel ai sdk](https://sdk.vercel.ai/docs/guides/providers/hugging-face)
 
 - [github markdown guide](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax)
+
+- [issue when deleting resource](https://github.com/aws/aws-cdk/issues/15366)
