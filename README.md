@@ -493,7 +493,9 @@ export class CodePipelineStack extends Stack {
 - Step 4. Deploy the CodePipelineChatbotStack
 
 > [!IMPORTANT]
-> In step 3, so ECS cluster task can pull an image which created manually in step 2. After step 4, we can check the Application Load Balancer URL and see the service working. Please ensure to provide .env with your Hugging Face API Key. Due to rate limite of free API, sometimes you might experience no response from the bot.
+> Please provide parameters in /bin/aws-ecs-demo.ts
+> Please provide Hugging Face API Key in /chatbot-app/.env
+> Due to rate limite of free API, sometimes you might experience no response from the bot.
 
 **Step 1. Deploy EcrStack which create a ECR repository**
 
@@ -529,6 +531,31 @@ cdk deploy EcsStack
 cdk deploy CodePipelineChatbotStack
 ```
 
+## Delete Resource
+
+> [!WARNING]  
+> Please be aware [cdk issue when destroying ecs cluster](https://github.com/aws/aws-cdk/issues/19275)
+
+First destroy the codepipeline stack
+
+```bash
+cdk destroy CodePipelineChatbotStack
+```
+
+Then destroy the EcrStack
+
+```bash
+cdk destroy EcrStack
+```
+
+Finally destroy the EcsStack
+
+```bash
+cdk destroy EcsStack
+```
+
+It is possible to automate all in one big application, but for demo purpose, just make it simple.CodePipelineChatbotStack
+
 ## Referece
 
 - [aws docs ecs standard](https://docs.aws.amazon.com/codepipeline/latest/userguide/ecs-cd-pipeline.html)
@@ -546,3 +573,5 @@ cdk deploy CodePipelineChatbotStack
 - [github markdown guide](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax)
 
 - [issue when deleting resource](https://github.com/aws/aws-cdk/issues/15366)
+
+- [CapacityProviderDependencyAspect](https://github.com/aws/aws-cdk/issues/19275)

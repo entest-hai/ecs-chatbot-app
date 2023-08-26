@@ -1,15 +1,17 @@
 import {
+  Aspects,
   aws_ec2,
   aws_ecr,
   aws_ecs,
   aws_elasticloadbalancingv2,
   aws_iam,
   Duration,
+  IAspect,
   Stack,
   StackProps,
 } from "aws-cdk-lib";
 import { Effect } from "aws-cdk-lib/aws-iam";
-import { Construct } from "constructs";
+import { Construct, IConstruct } from "constructs";
 
 interface EcsProps extends StackProps {
   vpcId: string;
@@ -22,6 +24,8 @@ export class EcsStack extends Stack {
 
   constructor(scope: Construct, id: string, props: EcsProps) {
     super(scope, id, props);
+
+    Aspects.of(this).add(new CapacityProviderDependencyAspect());
 
     // lookup an existed vpc
     const vpc = aws_ec2.Vpc.fromLookup(this, "LookUpVpc", {
@@ -167,5 +171,23 @@ export class EcsStack extends Stack {
 
     // exported
     this.service = service;
+  }
+}
+
+/**
+ * Add a dependency from capacity provider association to the cluster
+ * and from each service to the capacity provider association.
+ */
+class CapacityProviderDependencyAspect implements IAspect {
+  public visit(node: IConstruct): void {
+    if (node instanceof aws_ecs.Ec2Service) {
+      const children = node.cluster.node.findAll();
+      for (const child of children) {
+        if (child instanceof aws_ecs.CfnClusterCapacityProviderAssociations) {
+          child.node.addDependency(node.cluster);
+          node.node.addDependency(child);
+        }
+      }
+    }
   }
 }

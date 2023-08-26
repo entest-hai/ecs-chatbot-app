@@ -13,7 +13,7 @@ const ecr = new EcrStack(app, "EcrStack", {
 
 // create an ecs cluster
 const ecs = new EcsStack(app, "EcsStack", {
-  vpcId: "vpc-08fcf91d258dccdb7",
+  vpcId: "YOUR_VPC_ID_HERE",
   vpcName: "EksVpc",
   ecrRepoName: ecr.repoName,
   env: {
