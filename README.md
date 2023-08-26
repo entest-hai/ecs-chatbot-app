@@ -6,17 +6,18 @@ date: 20/08/2023
 
 ## Introduction
 
-> [!IMPORTANT]
-> Please check this video for detail how to deploy the app on amazon ecs and codepipeline
-> [ecs-chatbot-part-2.mp4](https://d2cvlmmg8c0xrp.cloudfront.net/mp4/ecs-chatbot-app-part-2.mp4)
-
 [GitHub](https://github.com/entest-hai/ecs-chatbot-app/tree/master) this project shows how to build a chatbot and deploy it on amazon ecs. Here are main components
 
-- [https://bot.entest.io](https://bot.entest.io)
 - [video demo](https://d2cvlmmg8c0xrp.cloudfront.net/mp4/chatbot-app-demo-1.mp4)
 - vercel ai sdk and hugging face model
 - deploy the web app using cdk
 - build a ci/cd pipeline using cdk
+
+> [!IMPORTANT]
+> Please check this video for detail how to deploy the app on amazon ecs and codepipeline
+> [ecs-chatbot-part-2.mp4](https://d2cvlmmg8c0xrp.cloudfront.net/mp4/ecs-chatbot-app-part-2.mp4)
+
+[![screencast thumbnail](./assets/ecs-chatbot-part-2.png)](https://d2cvlmmg8c0xrp.cloudfront.net/mp4/ecs-chatbot-app-part-2.mp4)
 
 ## Setup Project
 
