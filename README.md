@@ -15,10 +15,11 @@ date: 20/08/2023
 
 [![screencast thumbnail](./assets/ecs-blue-green-deployment.png)](https://d2cvlmmg8c0xrp.cloudfront.net/mp4/ecs-chatbot-app-part-2.mp4)
 
-> [!WARNING]  
-> Tested with "aws-cdk-lib": "2.93.0"
-> Need to use taskdef.json, appspec.yaml and iamgeDetail.json
-> Pull image from docker hub might experience rate limit
+> [!WARNING]
+>
+> - Tested with "aws-cdk-lib": "2.93.0"
+> - Need to use taskdef.json, appspec.yaml and iamgeDetail.json
+> - Pull image from docker hub might experience rate limit
 
 ## Setup Project
 
@@ -511,7 +512,6 @@ export class CodePipelineBlueGreen extends Stack {
 ```
 
 > [!IMPORTANT]
-
 > CDK automatically create role for codebuild, codedeploy, and codepipeline. Below is the content of the iam policy generated for codepipeline role. The codepline role will assume on of three different role for codebuild action, ecsdeploy action, and source action.
 
 ```json
