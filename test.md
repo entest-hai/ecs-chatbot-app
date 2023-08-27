@@ -11,14 +11,13 @@ date: 20/08/2023
 - [video demo](https://d2cvlmmg8c0xrp.cloudfront.net/mp4/chatbot-app-demo-1.mp4)
 - vercel ai sdk and hugging face model
 - deploy the web app using cdk
-- codepipeline blue/green deploy ecs
+- build a ci/cd pipeline using cdk
 
-[![screencast thumbnail](./assets/ecs-blue-green-deployment.png)](https://d2cvlmmg8c0xrp.cloudfront.net/mp4/ecs-chatbot-app-part-2.mp4)
+> [!IMPORTANT]
+> Please check this video for detail how to deploy the app on amazon ecs and codepipeline
+> [ecs-chatbot-part-2.mp4](https://d2cvlmmg8c0xrp.cloudfront.net/mp4/ecs-chatbot-app-part-2.mp4)
 
-> [!WARNING]  
-> Tested with "aws-cdk-lib": "2.93.0"
-> Need to use taskdef.json, appspec.yaml and iamgeDetail.json
-> Pull image from docker hub might experience rate limit
+[![screencast thumbnail](./assets/ecs-chatbot-app-part-2.png)](https://d2cvlmmg8c0xrp.cloudfront.net/mp4/ecs-chatbot-app-part-2.mp4)
 
 ## Setup Project
 
@@ -62,8 +61,6 @@ Finally the project structure looks like this
 |--package.json
 |--README.md
 |--tsconfig.json
-|--appspec.yaml
-|--taskdef.json
 ```
 
 ## Build Chatbot
@@ -113,28 +110,29 @@ The nextjs project has a project structure as below
 
 ## Build ECS Stack
 
-> [!IMPORTANT]
-> For ECS Blue/Green deployment, we need to use a CodeDeploy Deployment Group. Basically, we need to setup
-
-- An application load balancer
-- Two target groups (Blue and Green)
-- Create an ECS cluster and a service
-- Attach the glue target group with the service
-
 Create an Amazon ECS Cluster and a service for the chatbot app in lib/ecs-stack.ts as the following
 
 ```ts
+import {
+  aws_ec2,
+  aws_ecr,
+  aws_ecs,
+  aws_elasticloadbalancingv2,
+  aws_iam,
+  Duration,
+  Stack,
+  StackProps,
+} from "aws-cdk-lib";
+import { Effect } from "aws-cdk-lib/aws-iam";
+import { Construct } from "constructs";
+
 interface EcsProps extends StackProps {
   vpcId: string;
   vpcName: string;
-  ecrRepoName: string;
 }
 
-export class EcsBlueGreenStack extends Stack {
+export class EcsStack extends Stack {
   public readonly service: aws_ecs.FargateService;
-  public readonly listener: aws_elasticloadbalancingv2.ApplicationListener;
-  public readonly blueTargetGroup: aws_elasticloadbalancingv2.ApplicationTargetGroup;
-  public readonly greenTargetGroup: aws_elasticloadbalancingv2.ApplicationTargetGroup;
 
   constructor(scope: Construct, id: string, props: EcsProps) {
     super(scope, id, props);
@@ -145,77 +143,6 @@ export class EcsBlueGreenStack extends Stack {
       vpcName: props.vpcName,
     });
 
-    // application load balancer
-    const alb = new aws_elasticloadbalancingv2.ApplicationLoadBalancer(
-      this,
-      "AlbForEcs",
-      {
-        loadBalancerName: "AlbForEcsDemo",
-        vpc: vpc,
-        internetFacing: true,
-      }
-    );
-
-    // add product listener
-    const prodListener = alb.addListener("ProdListener", {
-      port: 80,
-      open: true,
-      protocol: aws_elasticloadbalancingv2.ApplicationProtocol.HTTP,
-    });
-
-    const testListener = alb.addListener("TestListener", {
-      port: 8080,
-      open: true,
-      protocol: aws_elasticloadbalancingv2.ApplicationProtocol.HTTP,
-    });
-
-    prodListener.connections.allowDefaultPortFromAnyIpv4("");
-    testListener.connections.allowDefaultPortFromAnyIpv4("");
-
-    // blue target group
-    const blueTargetGroup =
-      new aws_elasticloadbalancingv2.ApplicationTargetGroup(
-        this,
-        "GlueTargetGroup",
-        {
-          targetType: aws_elasticloadbalancingv2.TargetType.IP,
-          port: 80,
-          healthCheck: {
-            timeout: Duration.seconds(20),
-            interval: Duration.seconds(35),
-            path: "/",
-            protocol: aws_elasticloadbalancingv2.Protocol.HTTP,
-          },
-          vpc: vpc,
-        }
-      );
-
-    // green target group
-    const greenTargetGroup =
-      new aws_elasticloadbalancingv2.ApplicationTargetGroup(
-        this,
-        "GreenTargetGroup",
-        {
-          targetType: aws_elasticloadbalancingv2.TargetType.IP,
-          healthCheck: {
-            timeout: Duration.seconds(20),
-            interval: Duration.seconds(35),
-            path: "/",
-            protocol: aws_elasticloadbalancingv2.Protocol.HTTP,
-          },
-          port: 80,
-          vpc: vpc,
-        }
-      );
-
-    prodListener.addTargetGroups("GlueTargetGroup", {
-      targetGroups: [blueTargetGroup],
-    });
-
-    testListener.addTargetGroups("GreenTargetGroup", {
-      targetGroups: [greenTargetGroup],
-    });
-
     // ecs cluster
     const cluster = new aws_ecs.Cluster(this, "EcsClusterForWebServer", {
       vpc: vpc,
@@ -223,24 +150,6 @@ export class EcsBlueGreenStack extends Stack {
       containerInsights: true,
       enableFargateCapacityProviders: true,
     });
-
-    // task role pull ecr image
-    const executionRole = new aws_iam.Role(
-      this,
-      "RoleForEcsTaskToPullEcrChatbotImage",
-      {
-        assumedBy: new aws_iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
-        roleName: "RoleForEcsTaskToPullEcrChatbotImage",
-      }
-    );
-
-    executionRole.addToPolicy(
-      new aws_iam.PolicyStatement({
-        effect: Effect.ALLOW,
-        actions: ["ecr:*"],
-        resources: ["*"],
-      })
-    );
 
     // ecs task definition
     const task = new aws_ecs.FargateTaskDefinition(
@@ -256,7 +165,7 @@ export class EcsBlueGreenStack extends Stack {
         },
         // taskRole: "",
         // retrieve container images from ECR
-        executionRole: executionRole,
+        // executionRole: executionRole,
       }
     );
 
@@ -270,16 +179,16 @@ export class EcsBlueGreenStack extends Stack {
       environment: {
         FHR_ENV: "DEPLOY",
       },
-      image: aws_ecs.ContainerImage.fromRegistry(
-        "public.ecr.aws/b5v7e4v7/entest-chatbot-app:latest"
-      ),
-      // image: aws_ecs.ContainerImage.fromEcrRepository(
-      //   aws_ecr.Repository.fromRepositoryName(
-      //     this,
-      //     "entest-chatbot-app",
-      //     props.ecrRepoName
-      //   )
+      // image: aws_ecs.ContainerImage.fromRegistry(
+      //   "public.ecr.aws/b5v7e4v7/entest-chatbot-app:latest"
       // ),
+      image: aws_ecs.ContainerImage.fromEcrRepository(
+        aws_ecr.Repository.fromRepositoryName(
+          this,
+          "entest-chatbot-app",
+          "entest-chatbot-app"
+        )
+      ),
       portMappings: [{ containerPort: 3000 }],
     });
 
@@ -292,9 +201,11 @@ export class EcsBlueGreenStack extends Stack {
       cluster: cluster,
       taskDefinition: task,
       desiredCount: 2,
-      deploymentController: {
-        type: aws_ecs.DeploymentControllerType.CODE_DEPLOY,
-      },
+      // deploymentController: {
+      // default rolling update
+      // type: aws_ecs.DeploymentControllerType.ECS,
+      // type: aws_ecs.DeploymentControllerType.CODE_DEPLOY,
+      // },
       capacityProviderStrategies: [
         {
           capacityProvider: "FARGATE",
@@ -305,83 +216,89 @@ export class EcsBlueGreenStack extends Stack {
           weight: 0,
         },
       ],
-      platformVersion: FargatePlatformVersion.LATEST,
     });
 
-    // attach service to target group
-    service.connections.allowFrom(alb, aws_ec2.Port.tcp(80));
-    service.connections.allowFrom(alb, aws_ec2.Port.tcp(8080));
-    service.attachToApplicationTargetGroup(blueTargetGroup);
+    // scaling on cpu utilization
+    const scaling = service.autoScaleTaskCount({
+      maxCapacity: 4,
+      minCapacity: 1,
+    });
+
+    scaling.scaleOnMemoryUtilization("CpuUtilization", {
+      targetUtilizationPercent: 50,
+    });
+
+    // application load balancer
+    const alb = new aws_elasticloadbalancingv2.ApplicationLoadBalancer(
+      this,
+      "AlbForEcs",
+      {
+        loadBalancerName: "AlbForEcsDemo",
+        vpc: vpc,
+        internetFacing: true,
+      }
+    );
+
+    // add listener
+    const listener = alb.addListener("Listener", {
+      port: 80,
+      open: true,
+      protocol: aws_elasticloadbalancingv2.ApplicationProtocol.HTTP,
+    });
+
+    // add target
+    listener.addTargets("EcsService", {
+      port: 80,
+      targets: [
+        service.loadBalancerTarget({
+          containerName: "entest-chatbot-app",
+          containerPort: 3000,
+          protocol: aws_ecs.Protocol.TCP,
+        }),
+      ],
+      healthCheck: {
+        timeout: Duration.seconds(10),
+      },
+    });
 
     // exported
     this.service = service;
-    this.listener = prodListener;
-    this.blueTargetGroup = blueTargetGroup;
-    this.greenTargetGroup = greenTargetGroup;
-  }
-}
-```
-
-## Deployment Group
-
-The deployment group from CodeDeploy will handle the Blue/Green deployment with configuration and strategry for routing traffice such as ALL_AT_ONCE, CANARY.
-
-```ts
-interface EcsDeploymentProps extends StackProps {
-  service: aws_ecs.FargateService;
-  blueTargetGroup: aws_elasticloadbalancingv2.ApplicationTargetGroup;
-  greenTargetGroup: aws_elasticloadbalancingv2.ApplicationTargetGroup;
-  listener: aws_elasticloadbalancingv2.ApplicationListener;
-}
-
-export class EcsDeploymentGroup extends Stack {
-  public readonly deploymentGroup: aws_codedeploy.EcsDeploymentGroup;
-
-  constructor(scope: Construct, id: string, props: EcsDeploymentProps) {
-    super(scope, id, props);
-
-    const service = props.service;
-    const blueTargetGroup = props.blueTargetGroup;
-    const greenTargetGroup = props.greenTargetGroup;
-    const listener = props.listener;
-
-    this.deploymentGroup = new aws_codedeploy.EcsDeploymentGroup(
-      this,
-      "BlueGreenDeploymentGroup",
-      {
-        service: service,
-        blueGreenDeploymentConfig: {
-          blueTargetGroup,
-          greenTargetGroup,
-          listener,
-        },
-        deploymentConfig: aws_codedeploy.EcsDeploymentConfig.ALL_AT_ONCE,
-      }
-    );
   }
 }
 ```
 
 ## Build CI/CD Pipeline
 
-> [!IMPORTANT]
-> Please pay attention to taskdef.json, appspec.yaml and imageDetail.json
-
 Let create a CI/CD pipeline for deploying the chatbot app continuously as the following
 
 ```ts
-interface CodePipelineBlueGreenProps extends StackProps {
+import {
+  Duration,
+  RemovalPolicy,
+  Stack,
+  StackProps,
+  aws_codebuild,
+  aws_codecommit,
+  aws_codepipeline,
+  aws_codepipeline_actions,
+  aws_ecr,
+  aws_ecs,
+  aws_iam,
+} from "aws-cdk-lib";
+import { Construct } from "constructs";
+import * as path from "path";
+
+interface CodePipelineProps extends StackProps {
   readonly connectArn?: string;
   readonly repoName: string;
   readonly repoBranch: string;
   readonly repoOwner: string;
   readonly ecrRepoName: string;
   readonly service: aws_ecs.FargateService;
-  readonly deploymentGroup: aws_codedeploy.EcsDeploymentGroup;
 }
 
-export class CodePipelineBlueGreen extends Stack {
-  constructor(scope: Construct, id: string, props: CodePipelineBlueGreenProps) {
+export class CodePipelineStack extends Stack {
+  constructor(scope: Construct, id: string, props: CodePipelineProps) {
     super(scope, id, props);
 
     // code commit
@@ -393,10 +310,15 @@ export class CodePipelineBlueGreen extends Stack {
       }
     );
 
-    const ecrRepository = aws_ecr.Repository.fromRepositoryName(
+    // ecr repository
+    const ecrRepository = new aws_ecr.Repository(
       this,
       "EcrRepositoryForChatbot",
-      props.ecrRepoName
+      {
+        removalPolicy: RemovalPolicy.DESTROY,
+        repositoryName: props.ecrRepoName,
+        autoDeleteImages: true,
+      }
     );
 
     // artifact - source code
@@ -461,6 +383,15 @@ export class CodePipelineBlueGreen extends Stack {
         {
           stageName: "SourceCode",
           actions: [
+            // new aws_codepipeline_actions.CodeStarConnectionsSourceAction({
+            //   actionName: "GitHub",
+            //   owner: props.repoOwner,
+            //   repo: props.repoName,
+            //   branch: props.repoBranch,
+            //   connectionArn: props.connectArn,
+            //   output: sourceOutput,
+            // }),
+
             new aws_codepipeline_actions.CodeCommitSourceAction({
               actionName: "CodeCommitChatbot",
               repository: codecommitRepository,
@@ -482,25 +413,18 @@ export class CodePipelineBlueGreen extends Stack {
             }),
           ],
         },
+
+        // deploy new tag image to ecs service
         {
-          stageName: "EcsCodeDeployBlueGreen",
+          stageName: "EcsCodeDeploy",
           actions: [
-            new aws_codepipeline_actions.CodeDeployEcsDeployAction({
-              actionName: "EcsDeployGlueGreen",
-              deploymentGroup: props.deploymentGroup,
-              // file name shoulde be appspec.yaml
-              appSpecTemplateInput: sourceOutput,
-              // update task definition
-              containerImageInputs: [
-                {
-                  // should contain imageDetail.json
-                  input: codeBuildOutput,
-                  taskDefinitionPlaceholder: "IMAGE1_NAME",
-                },
-              ],
-              // should be taskdef.json
-              taskDefinitionTemplateInput: sourceOutput,
-              // variablesNamespace: ''
+            new aws_codepipeline_actions.EcsDeployAction({
+              // role: pipelineRole,
+              actionName: "Deploy",
+              service: props.service,
+              input: codeBuildOutput,
+              // imageFile: codeBuildOutput.atPath(""),
+              deploymentTimeout: Duration.minutes(10),
             }),
           ],
         },
@@ -513,6 +437,9 @@ export class CodePipelineBlueGreen extends Stack {
 > [!IMPORTANT]
 
 > CDK automatically create role for codebuild, codedeploy, and codepipeline. Below is the content of the iam policy generated for codepipeline role. The codepline role will assume on of three different role for codebuild action, ecsdeploy action, and source action.
+
+<details>
+  <summary>ROLE</summary>
 
 ```json
 {
@@ -561,86 +488,78 @@ export class CodePipelineBlueGreen extends Stack {
 }
 ```
 
+</details>
+
 ## CDK Deploy
 
-Let create a CDK app in bin/aws-ecs-demo.ts as below. It is possible to use either an existing VPC or creating a new VPC for the ECS cluster.
+- Step 1. Deploy EcrStack
+- Step 2. Build and push an ECR image manulaly
+- Step 3. Deploy the EcsStack
+- Step 4. Deploy the CodePipelineChatbotStack
 
-```ts
-#!/usr/bin/env node
-import * as cdk from "aws-cdk-lib";
-import { EcrStack } from "../lib/ecr-stack";
-import { EcsBlueGreenStack } from "../lib/ecs-blue-green-stack";
-import { EcsDeploymentGroup } from "../lib/ecs-blue-green-stack";
-import { CodePipelineBlueGreen } from "../lib/ecs-blue-green-stack";
+> [!IMPORTANT]
+> Please provide parameters in /bin/aws-ecs-demo.ts
+> Please provide Hugging Face API Key in /chatbot-app/.env
+> Due to rate limite of free API, sometimes you might experience no response from the bot.
 
-const app = new cdk.App();
-
-// create an ecr repository
-const ecr = new EcrStack(app, "EcrStack", {
-  repoName: "entest-chatbot-app",
-});
-
-// create an ecs blue green
-const ecs = new EcsBlueGreenStack(app, "EcsBlueGreenStack", {
-  vpcId: "vpc-0c8e39fd00db3261f",
-  vpcName: "RedshiftVpc",
-  ecrRepoName: ecr.repoName,
-  env: {
-    region: process.env.CDK_DEFAULT_REGION,
-    account: process.env.CDK_DEFAULT_ACCOUNT,
-  },
-});
-
-// codedeploy deployment group
-const deploy = new EcsDeploymentGroup(app, "EcsDeploymentGroup", {
-  service: ecs.service,
-  blueTargetGroup: ecs.blueTargetGroup,
-  greenTargetGroup: ecs.greenTargetGroup,
-  listener: ecs.listener,
-  env: {
-    region: process.env.CDK_DEFAULT_REGION,
-    account: process.env.CDK_DEFAULT_ACCOUNT,
-  },
-});
-
-// create a pipeline
-new CodePipelineBlueGreen(app, "CodePipelineBlueGreen", {
-  repoName: "ecs-chatbot-app",
-  repoBranch: "master",
-  repoOwner: "entest-hai",
-  ecrRepoName: ecr.repoName,
-  service: ecs.service,
-  deploymentGroup: deploy.deploymentGroup,
-  env: {
-    region: process.env.CDK_DEFAULT_REGION,
-    account: process.env.CDK_DEFAULT_ACCOUNT,
-  },
-});
-```
-
-First, we need to deploy the ECR repository
+**Step 1. Deploy EcrStack which create a ECR repository**
 
 ```bash
 cdk deploy EcrStack
 ```
 
-Second, build an image locally and push to the ecr respository using /chatbot-app/build.py
+**Step 2. Build and push an ECR image manulaly**
+
+There is a python script in /chatbot-app/build.py will
 
 ```bash
 python3 build.py
 ```
 
-Third, deploy an ECS cluster with a service using the image above
+You can test this iamge locally
 
 ```bash
-cdk deploy EcsBlueGreenStack
+sudo docker run -p 3000:3000 $IMAGE_NAME
 ```
 
-Finally, we create a ci/cd pipeline for automatically build and deploy the latest container image tag
+**Step 3. Deploy the EcsStack**
+
+Goto the bin directory and deploy the ecs cluster using cdk
 
 ```bash
-cdk deploy CodepipelineBlueGreen
+cdk deploy EcsStack
 ```
+
+**Step 4. Deploy the CodePipeline**
+
+```bash
+cdk deploy CodePipelineChatbotStack
+```
+
+## Delete Resource
+
+> [!WARNING]  
+> Please be aware [cdk issue when destroying ecs cluster](https://github.com/aws/aws-cdk/issues/19275)
+
+First destroy the codepipeline stack
+
+```bash
+cdk destroy CodePipelineChatbotStack
+```
+
+Then destroy the EcrStack
+
+```bash
+cdk destroy EcrStack
+```
+
+Finally destroy the EcsStack
+
+```bash
+cdk destroy EcsStack
+```
+
+It is possible to automate all in one big application, but for demo purpose, just make it simple.CodePipelineChatbotStack
 
 ## Referece
 
@@ -658,6 +577,6 @@ cdk deploy CodepipelineBlueGreen
 
 - [github markdown guide](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax)
 
-- [aws ecs blue green pipeline](https://docs.aws.amazon.com/codepipeline/latest/userguide/tutorials-ecs-ecr-codedeploy.html)
+- [issue when deleting resource](https://github.com/aws/aws-cdk/issues/15366)
 
-- [imageDetail.json](https://docs.aws.amazon.com/codepipeline/latest/userguide/file-reference.html#file-reference-ecs-bluegreen)
+- [CapacityProviderDependencyAspect](https://github.com/aws/aws-cdk/issues/19275)

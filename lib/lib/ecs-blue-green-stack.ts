@@ -1,129 +1,24 @@
----
-author: haimtran
-title: develop an chatbot app and deploy on amazon ecs
-date: 20/08/2023
----
+import {
+  aws_codedeploy,
+  aws_ec2,
+  aws_ecr,
+  aws_ecs,
+  aws_elasticloadbalancingv2,
+  aws_iam,
+  aws_codebuild,
+  aws_codecommit,
+  aws_codepipeline,
+  aws_codepipeline_actions,
+  Duration,
+  Stack,
+  StackProps,
+} from "aws-cdk-lib";
 
-## Introduction
+import * as path from "path";
+import { FargatePlatformVersion } from "aws-cdk-lib/aws-ecs";
+import { Effect } from "aws-cdk-lib/aws-iam";
+import { Construct } from "constructs";
 
-[GitHub](https://github.com/entest-hai/ecs-chatbot-app/tree/master) this project shows how to build a chatbot and deploy it on amazon ecs. Here are main components
-
-- [video demo](https://d2cvlmmg8c0xrp.cloudfront.net/mp4/chatbot-app-demo-1.mp4)
-- vercel ai sdk and hugging face model
-- deploy the web app using cdk
-- codepipeline blue/green deploy ecs
-
-[![screencast thumbnail](./assets/ecs-blue-green-deployment.png)](https://d2cvlmmg8c0xrp.cloudfront.net/mp4/ecs-chatbot-app-part-2.mp4)
-
-> [!WARNING]  
-> Tested with "aws-cdk-lib": "2.93.0"
-> Need to use taskdef.json, appspec.yaml and iamgeDetail.json
-> Pull image from docker hub might experience rate limit
-
-## Setup Project
-
-Let create a new folder for the project
-
-```bash
-mkdir ecs-chatbot-app
-```
-
-Then init a new CDK project in typescript
-
-```bash
-cdk init --l typescript
-```
-
-Next, create a new nextjs project in chatbot-app folder
-
-```bash
-npx create-next-app@latest chatbot-app
-```
-
-Go into the chatbot-app folder and install some dependencies
-
-```bash
-npm install ai
-```
-
-Finally the project structure looks like this
-
-```
-|--bin
-|--lib
-|--chatbot-app
-|--test
-|--cdk.out
-|--node_modules
-|--cdk.context.json
-|--cdk.json
-|--jest.config.js
-|--package-lock.json
-|--package.json
-|--README.md
-|--tsconfig.json
-|--appspec.yaml
-|--taskdef.json
-```
-
-## Build Chatbot
-
-Prerequisites: you have to create a Hugging Face token [here]()
-
-Let go int the directory chatbot-app and create a new nextjs project
-
-```bash
-npx create-next-app@latest
-```
-
-Then install dependencies
-
-```bash
-npm install ai openai @huggingface/inference clsx lucide-react
-```
-
-Store your Hugging Face token in .env
-
-```bash
-OPENAI_API_KEY=xxxxxxxxx
-```
-
-The nextjs project has a project structure as below
-
-```
-|--chatbot-app
-   |--app
-      |--api
-         |--route.ts
-      |--global.css
-      |--icons.tsx
-      |--layout.tsx
-      |--page.tsx
-    |--public
-    |--.env
-    |--.eslintrc.json
-    |--Dockerfile
-    |--next.config.js
-    |--package-lock.json
-    |--package.json
-    |--postcss.config.js
-    |--tailwind.config.ts
-    |--tsconfig.json
-```
-
-## Build ECS Stack
-
-> [!IMPORTANT]
-> For ECS Blue/Green deployment, we need to use a CodeDeploy Deployment Group. Basically, we need to setup
-
-- An application load balancer
-- Two target groups (Blue and Green)
-- Create an ECS cluster and a service
-- Attach the glue target group with the service
-
-Create an Amazon ECS Cluster and a service for the chatbot app in lib/ecs-stack.ts as the following
-
-```ts
 interface EcsProps extends StackProps {
   vpcId: string;
   vpcName: string;
@@ -320,13 +215,7 @@ export class EcsBlueGreenStack extends Stack {
     this.greenTargetGroup = greenTargetGroup;
   }
 }
-```
 
-## Deployment Group
-
-The deployment group from CodeDeploy will handle the Blue/Green deployment with configuration and strategry for routing traffice such as ALL_AT_ONCE, CANARY.
-
-```ts
 interface EcsDeploymentProps extends StackProps {
   service: aws_ecs.FargateService;
   blueTargetGroup: aws_elasticloadbalancingv2.ApplicationTargetGroup;
@@ -360,16 +249,7 @@ export class EcsDeploymentGroup extends Stack {
     );
   }
 }
-```
 
-## Build CI/CD Pipeline
-
-> [!IMPORTANT]
-> Please pay attention to taskdef.json, appspec.yaml and imageDetail.json
-
-Let create a CI/CD pipeline for deploying the chatbot app continuously as the following
-
-```ts
 interface CodePipelineBlueGreenProps extends StackProps {
   readonly connectArn?: string;
   readonly repoName: string;
@@ -461,6 +341,15 @@ export class CodePipelineBlueGreen extends Stack {
         {
           stageName: "SourceCode",
           actions: [
+            // new aws_codepipeline_actions.CodeStarConnectionsSourceAction({
+            //   actionName: "GitHub",
+            //   owner: props.repoOwner,
+            //   repo: props.repoName,
+            //   branch: props.repoBranch,
+            //   connectionArn: props.connectArn,
+            //   output: sourceOutput,
+            // }),
+
             new aws_codepipeline_actions.CodeCommitSourceAction({
               actionName: "CodeCommitChatbot",
               repository: codecommitRepository,
@@ -482,6 +371,20 @@ export class CodePipelineBlueGreen extends Stack {
             }),
           ],
         },
+        // deploy new tag image to ecs service
+        // {
+        //   stageName: "EcsCodeDeploy",
+        //   actions: [
+        //     new aws_codepipeline_actions.EcsDeployAction({
+        //       // role: pipelineRole,
+        //       actionName: "Deploy",
+        //       service: props.service,
+        //       input: codeBuildOutput,
+        //       // imageFile: codeBuildOutput.atPath(""),
+        //       deploymentTimeout: Duration.minutes(10),
+        //     }),
+        //   ],
+        // },
         {
           stageName: "EcsCodeDeployBlueGreen",
           actions: [
@@ -508,156 +411,3 @@ export class CodePipelineBlueGreen extends Stack {
     });
   }
 }
-```
-
-> [!IMPORTANT]
-
-> CDK automatically create role for codebuild, codedeploy, and codepipeline. Below is the content of the iam policy generated for codepipeline role. The codepline role will assume on of three different role for codebuild action, ecsdeploy action, and source action.
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Action": [
-        "s3:Abort*",
-        "s3:DeleteObject*",
-        "s3:GetBucket*",
-        "s3:GetObject*",
-        "s3:List*",
-        "s3:PutObject",
-        "s3:PutObjectLegalHold",
-        "s3:PutObjectRetention",
-        "s3:PutObjectTagging",
-        "s3:PutObjectVersionTagging"
-      ],
-      "Resource": [
-        "arn:aws:s3:::artifact-bucket-name",
-        "arn:aws:s3:::artifact-bucket-name/*"
-      ],
-      "Effect": "Allow"
-    },
-    {
-      "Action": [
-        "kms:Decrypt",
-        "kms:DescribeKey",
-        "kms:Encrypt",
-        "kms:GenerateDataKey*",
-        "kms:ReEncrypt*"
-      ],
-      "Resource": "arn:aws:kms:ap-southeast-1:$ACCOUNT_ID:key/$KEY_ID",
-      "Effect": "Allow"
-    },
-    {
-      "Action": "sts:AssumeRole",
-      "Resource": [
-        "arn:aws:iam::$ACCOUNT_ID:role/CodePipelineChatbotBuildC-9DSS5JG1VE7T",
-        "arn:aws:iam::$ACCOUNT_ID:role/CodePipelineChatbotEcsCod-AO6ZDE82ELPC",
-        "arn:aws:iam::$ACCOUNT_ID:role/CodePipelineChatbotSource-1SZLHE9CFAAXO"
-      ],
-      "Effect": "Allow"
-    }
-  ]
-}
-```
-
-## CDK Deploy
-
-Let create a CDK app in bin/aws-ecs-demo.ts as below. It is possible to use either an existing VPC or creating a new VPC for the ECS cluster.
-
-```ts
-#!/usr/bin/env node
-import * as cdk from "aws-cdk-lib";
-import { EcrStack } from "../lib/ecr-stack";
-import { EcsBlueGreenStack } from "../lib/ecs-blue-green-stack";
-import { EcsDeploymentGroup } from "../lib/ecs-blue-green-stack";
-import { CodePipelineBlueGreen } from "../lib/ecs-blue-green-stack";
-
-const app = new cdk.App();
-
-// create an ecr repository
-const ecr = new EcrStack(app, "EcrStack", {
-  repoName: "entest-chatbot-app",
-});
-
-// create an ecs blue green
-const ecs = new EcsBlueGreenStack(app, "EcsBlueGreenStack", {
-  vpcId: "vpc-0c8e39fd00db3261f",
-  vpcName: "RedshiftVpc",
-  ecrRepoName: ecr.repoName,
-  env: {
-    region: process.env.CDK_DEFAULT_REGION,
-    account: process.env.CDK_DEFAULT_ACCOUNT,
-  },
-});
-
-// codedeploy deployment group
-const deploy = new EcsDeploymentGroup(app, "EcsDeploymentGroup", {
-  service: ecs.service,
-  blueTargetGroup: ecs.blueTargetGroup,
-  greenTargetGroup: ecs.greenTargetGroup,
-  listener: ecs.listener,
-  env: {
-    region: process.env.CDK_DEFAULT_REGION,
-    account: process.env.CDK_DEFAULT_ACCOUNT,
-  },
-});
-
-// create a pipeline
-new CodePipelineBlueGreen(app, "CodePipelineBlueGreen", {
-  repoName: "ecs-chatbot-app",
-  repoBranch: "master",
-  repoOwner: "entest-hai",
-  ecrRepoName: ecr.repoName,
-  service: ecs.service,
-  deploymentGroup: deploy.deploymentGroup,
-  env: {
-    region: process.env.CDK_DEFAULT_REGION,
-    account: process.env.CDK_DEFAULT_ACCOUNT,
-  },
-});
-```
-
-First, we need to deploy the ECR repository
-
-```bash
-cdk deploy EcrStack
-```
-
-Second, build an image locally and push to the ecr respository using /chatbot-app/build.py
-
-```bash
-python3 build.py
-```
-
-Third, deploy an ECS cluster with a service using the image above
-
-```bash
-cdk deploy EcsBlueGreenStack
-```
-
-Finally, we create a ci/cd pipeline for automatically build and deploy the latest container image tag
-
-```bash
-cdk deploy CodepipelineBlueGreen
-```
-
-## Referece
-
-- [aws docs ecs standard](https://docs.aws.amazon.com/codepipeline/latest/userguide/ecs-cd-pipeline.html)
-
-- [aws docs ecs blue green](https://docs.aws.amazon.com/codepipeline/latest/userguide/tutorials-ecs-ecr-codedeploy.html)
-
-- [aws docs ecs](https://docs.aws.amazon.com/codedeploy/latest/userguide/tutorial-ecs-deployment.html)
-
-- [ecs task and execution role](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html)
-
-- [AmazonEC2ContainerRegistryPowerUser](https://docs.aws.amazon.com/codepipeline/latest/userguide/ecs-cd-pipeline.html)
-
-- [vercel ai sdk](https://sdk.vercel.ai/docs/guides/providers/hugging-face)
-
-- [github markdown guide](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax)
-
-- [aws ecs blue green pipeline](https://docs.aws.amazon.com/codepipeline/latest/userguide/tutorials-ecs-ecr-codedeploy.html)
-
-- [imageDetail.json](https://docs.aws.amazon.com/codepipeline/latest/userguide/file-reference.html#file-reference-ecs-bluegreen)

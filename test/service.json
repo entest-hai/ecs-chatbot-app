@@ -1,0 +1,32 @@
+{
+  "cluster": "test",
+  "serviceName": "service-bluegreen",
+  "taskDefinition": "test",
+  "loadBalancers": [
+    {
+      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:$ACCOUNT_ID:targetgroup/TG1/c9be4c6844993747",
+      "containerName": "entest-chatbot-app",
+      "containerPort": 3000
+    }
+  ],
+  "launchType": "FARGATE",
+  "schedulingStrategy": "REPLICA",
+  "deploymentController": {
+    "type": "CODE_DEPLOY"
+  },
+  "platformVersion": "LATEST",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "assignPublicIp": "ENABLED",
+      "securityGroups": [
+        "sg-0d42a802cc556c1db"
+      ],
+      "subnets": [
+        "subnet-0055cbfc2d033377f",
+        "subnet-0a2f50e461793e3df",
+        "subnet-01bcc81d536f26526"
+      ]
+    }
+  },
+  "desiredCount": 1
+}

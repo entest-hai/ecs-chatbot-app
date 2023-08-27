@@ -1,0 +1,39 @@
+{
+  "containerDefinitions": [
+    {
+      "name": "entest-chatbot-app",
+      "image": "<IMAGE1_NAME>",
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "hostPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "FHR_ENV",
+          "value": "DEPLOY"
+        }
+      ]
+    }
+  ],
+  "family": "latest",
+  "taskRoleArn": "arn:aws:iam::$ACCOUNT_ID:role/ExecutionRole",
+  "networkMode": "awsvpc",
+  "placementConstraints": [],
+  "compatibilities": [
+    "EC2",
+    "FARGATE"
+  ],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "2048",
+  "memory": "4096",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  }
+}
