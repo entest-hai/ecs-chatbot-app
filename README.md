@@ -642,8 +642,6 @@ Finally, we create a ci/cd pipeline for automatically build and deploy the lates
 cdk deploy CodepipelineBlueGreen
 ```
 
-:smile:
-
 ## Referece
 
 - [aws docs ecs standard](https://docs.aws.amazon.com/codepipeline/latest/userguide/ecs-cd-pipeline.html)
