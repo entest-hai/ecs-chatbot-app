@@ -1,6 +1,7 @@
 artifacts:
   files:
     - imagedefinitions.json
+    - imageDetail.json
 version: "0.2"
 phases:
   install:
@@ -18,4 +19,6 @@ phases:
     commands:
       - docker push ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION}-${TAG_NAME}
       - printf '[{"name":"%s","imageUri":"%s"}]' ${REPO_NAME} ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION}-${TAG_NAME} > imagedefinitions.json
+      - printf '{"ImageURI":"%s"}' ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION}-${TAG_NAME} > imageDetail.json
       - cat imagedefinitions.json
+      - cat imageDetail.json 

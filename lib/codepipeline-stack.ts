@@ -1,6 +1,5 @@
 import {
   Duration,
-  RemovalPolicy,
   Stack,
   StackProps,
   aws_codebuild,
