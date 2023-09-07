@@ -580,3 +580,5 @@ It is possible to automate all in one big application, but for demo purpose, jus
 - [issue when deleting resource](https://github.com/aws/aws-cdk/issues/15366)
 
 - [CapacityProviderDependencyAspect](https://github.com/aws/aws-cdk/issues/19275)
+
+- [capacity provider is in use issue](https://github.com/aws/aws-cdk/issues/15366)
